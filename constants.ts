@@ -1,0 +1,61 @@
+import { CelestialType, CelestialObject } from './types';
+
+export const G = 1000; // Gravitational constant for simulation scale
+export const C = 5000; // Speed of light for simulation scale (affects RS)
+export const RS_FACTOR = 2 * G / (C * C); // Schwarzschild radius factor: Rs = 2GM/c^2 ~ simplified to K * M
+
+// UI Colors
+export const COLORS = {
+  primary: '#0ea5e9', // Sky blue
+  accent: '#f59e0b',  // Amber
+  background: '#000000',
+  grid: 'rgba(6, 182, 212, 0.15)', // Cyan low opacity
+  text: '#f3f4f6',
+};
+
+// Physics Limits
+export const MAX_TRAIL_LENGTH = 50;
+export const MIN_ZOOM = 0.1;
+export const MAX_ZOOM = 5.0;
+
+export const PLANET_PRESETS = {
+  EARTH: { mass: 2, radius: 5, label: 'Earth', color: '#60a5fa' }, // Blue
+  JUPITER: { mass: 8, radius: 11, label: 'Jupiter', color: '#d97706' }, // Orange/Brown
+  MARS: { mass: 1, radius: 3.5, label: 'Mars', color: '#ef4444' }, // Red
+  NEPTUNE: { mass: 4, radius: 8, label: 'Neptune', color: '#6366f1' } // Indigo
+} as const;
+
+export type PlanetPresetKey = keyof typeof PLANET_PRESETS;
+
+export const INITIAL_OBJECTS: CelestialObject[] = [
+  {
+    id: 'star-1',
+    type: CelestialType.STAR,
+    pos: { x: 300, y: 0 },
+    vel: { x: 0, y: 15 }, // Circular orbit approx
+    mass: 10,
+    radius: 8,
+    color: '#fbbf24', // Amber
+    trail: []
+  },
+  {
+    id: 'planet-1',
+    type: CelestialType.PLANET,
+    pos: { x: -400, y: 100 },
+    vel: { x: 5, y: -12 },
+    mass: 2,
+    radius: 5,
+    color: '#9ca3af', // Gray
+    trail: []
+  },
+  {
+    id: 'comet-1',
+    type: CelestialType.COMET,
+    pos: { x: -600, y: -600 },
+    vel: { x: 25, y: 20 }, // Hyperbolic
+    mass: 0.5,
+    radius: 3,
+    color: '#60a5fa', // Blue
+    trail: []
+  }
+];

@@ -1,0 +1,5 @@
+{
+  "name": "Event Horizon - Black Hole Simulator",
+  "description": "An interactive gravitational lensing and orbital mechanics simulation. Visualize space-time distortion, simulate celestial orbits, and learn about black hole physics with AI assistance.",
+  "requestFramePermissions": []
+}
