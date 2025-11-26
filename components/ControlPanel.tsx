@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Settings, Play, Pause, RefreshCw, PlusCircle, Grid3X3, Eye, Zap, Globe } from 'lucide-react';
+import { Settings, Play, Pause, RefreshCw, PlusCircle, Grid3X3, Eye, Zap, Globe, Sun } from 'lucide-react';
 import { SimulationConfig } from '../types';
-import { PLANET_PRESETS, PlanetPresetKey } from '../constants';
+import { PLANET_PRESETS, PlanetPresetKey, STAR_PRESETS, StarPresetKey } from '../constants';
 
 interface ControlPanelProps {
   config: SimulationConfig;
@@ -9,6 +9,7 @@ interface ControlPanelProps {
   onReset: () => void;
   onAddObject: () => void; // Adds Comet
   onAddPlanet: (key: PlanetPresetKey) => void;
+  onAddStar: (key: StarPresetKey) => void;
   isExpanded: boolean;
   toggleExpand: () => void;
 }
@@ -19,10 +20,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onReset, 
   onAddObject,
   onAddPlanet,
+  onAddStar,
   isExpanded,
   toggleExpand 
 }) => {
   const [selectedPlanet, setSelectedPlanet] = useState<PlanetPresetKey>('EARTH');
+  const [selectedStar, setSelectedStar] = useState<StarPresetKey>('SUN');
   
   const updateConfig = <K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -153,18 +156,45 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-cyan-500"
                     >
                       {Object.entries(PLANET_PRESETS).map(([key, val]) => (
-                        <option key={key} value={key}>{val.label} Size</option>
+                        <option key={key} value={key}>{val.label}</option>
                       ))}
                     </select>
                     <button 
                       onClick={() => onAddPlanet(selectedPlanet)}
                       className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1 rounded transition"
-                      title="Add Selected Planet"
+                      title="Add Planet"
                     >
                       <PlusCircle size={18} />
                     </button>
                  </div>
                </div>
+
+               {/* Stars */}
+               <div className="bg-gray-800/50 p-2 rounded border border-gray-700 space-y-2 mt-2">
+                 <div className="flex items-center gap-2 text-sm text-gray-300">
+                    <Sun size={14} className="text-yellow-400"/>
+                    <span>New Star</span>
+                 </div>
+                 <div className="flex gap-2">
+                    <select 
+                      value={selectedStar} 
+                      onChange={(e) => setSelectedStar(e.target.value as StarPresetKey)}
+                      className="flex-1 bg-gray-900 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-cyan-500"
+                    >
+                      {Object.entries(STAR_PRESETS).map(([key, val]) => (
+                        <option key={key} value={key}>{val.label}</option>
+                      ))}
+                    </select>
+                    <button 
+                      onClick={() => onAddStar(selectedStar)}
+                      className="bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
+                      title="Add Star"
+                    >
+                      <PlusCircle size={18} />
+                    </button>
+                 </div>
+               </div>
+
             </div>
             
             <div className="pt-4 border-t border-gray-800">

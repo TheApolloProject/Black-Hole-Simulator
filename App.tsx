@@ -3,7 +3,7 @@ import BlackHoleCanvas from './components/BlackHoleCanvas';
 import ControlPanel from './components/ControlPanel';
 import AIChat from './components/AIChat';
 import { SimulationConfig, CelestialObject, ViewportState, CelestialType } from './types';
-import { INITIAL_OBJECTS, PLANET_PRESETS, PlanetPresetKey, G } from './constants';
+import { INITIAL_OBJECTS, PLANET_PRESETS, PlanetPresetKey, STAR_PRESETS, StarPresetKey, G } from './constants';
 import { MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -91,6 +91,31 @@ const App: React.FC = () => {
     setObjects(prev => [...prev, newPlanet]);
   };
 
+  const handleAddStar = (key: StarPresetKey) => {
+    const preset = STAR_PRESETS[key];
+    const randomAngle = Math.random() * Math.PI * 2;
+    // Stars generally further out to avoid crowding the inner visualization
+    const distance = 500 + Math.random() * 400; 
+    
+    const vMag = Math.sqrt((G * config.blackHoleMass) / distance);
+    
+    const vx = -Math.sin(randomAngle) * vMag;
+    const vy = Math.cos(randomAngle) * vMag;
+
+    const newStar: CelestialObject = {
+      id: `star-${Date.now()}`,
+      type: CelestialType.STAR,
+      pos: { x: Math.cos(randomAngle) * distance, y: Math.sin(randomAngle) * distance },
+      vel: { x: vx, y: vy },
+      mass: preset.mass,
+      radius: preset.radius,
+      color: preset.color,
+      trail: []
+    };
+
+    setObjects(prev => [...prev, newStar]);
+  };
+
   return (
     <div className="w-screen h-screen bg-black overflow-hidden flex relative">
       
@@ -123,6 +148,7 @@ const App: React.FC = () => {
         onReset={handleReset}
         onAddObject={handleAddObject}
         onAddPlanet={handleAddPlanet}
+        onAddStar={handleAddStar}
         isExpanded={isSidebarExpanded}
         toggleExpand={() => setIsSidebarExpanded(!isSidebarExpanded)}
       />

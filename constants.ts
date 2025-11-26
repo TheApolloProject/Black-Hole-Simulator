@@ -27,6 +27,17 @@ export const PLANET_PRESETS = {
 
 export type PlanetPresetKey = keyof typeof PLANET_PRESETS;
 
+export const STAR_PRESETS = {
+  SUN: { mass: 10, radius: 12, label: 'Sun-like', color: '#fbbf24' }, // Yellow
+  SIRIUS: { mass: 20, radius: 16, label: 'Sirius (White)', color: '#e0f2fe' }, // White/Blueish
+  RIGEL: { mass: 40, radius: 25, label: 'Rigel (Blue Supergiant)', color: '#60a5fa' }, // Blue
+  BETELGEUSE: { mass: 30, radius: 45, label: 'Betelgeuse (Red Giant)', color: '#ef4444' }, // Red
+  UY_SCUTI: { mass: 60, radius: 70, label: 'UY Scuti (Hypergiant)', color: '#b91c1c' }, // Deep Red
+  STEPHENSON: { mass: 70, radius: 80, label: 'Stephenson 2-18', color: '#7f1d1d' } // Dark Red
+} as const;
+
+export type StarPresetKey = keyof typeof STAR_PRESETS;
+
 export const INITIAL_OBJECTS: CelestialObject[] = [
   {
     id: 'star-1',
@@ -34,7 +45,7 @@ export const INITIAL_OBJECTS: CelestialObject[] = [
     pos: { x: 300, y: 0 },
     vel: { x: 0, y: 15 }, // Circular orbit approx
     mass: 10,
-    radius: 8,
+    radius: 12,
     color: '#fbbf24', // Amber
     trail: []
   },
