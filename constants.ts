@@ -1,8 +1,8 @@
 import { CelestialType, CelestialObject } from './types';
 
 export const G = 1000; // Gravitational constant for simulation scale
-export const C = 5000; // Speed of light for simulation scale (affects RS)
-export const RS_FACTOR = 2 * G / (C * C); // Schwarzschild radius factor: Rs = 2GM/c^2 ~ simplified to K * M
+export const C = 200; // Speed of light for simulation scale (reduced for visible relativistic effects)
+export const RS_FACTOR = 1.5; // Visual scaling for Schwarzschild radius (Rs = M * RS_FACTOR)
 
 // UI Colors
 export const COLORS = {
@@ -14,7 +14,7 @@ export const COLORS = {
 };
 
 // Physics Limits
-export const MAX_TRAIL_LENGTH = 50;
+export const MAX_TRAIL_LENGTH = 100; // Longer trails for slingshot visualization
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 5.0;
 

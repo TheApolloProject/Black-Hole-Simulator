@@ -101,7 +101,9 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
     // Calculate derived constants for rendering
     const rs = config.blackHoleMass * RS_FACTOR; // Schwarzschild Radius
-    const re = Math.sqrt(4 * G * config.blackHoleMass * 100); // Einstein Radius approx scaled for visual
+    // Einstein Radius for visual lensing scaling.
+    // RE = sqrt(4GM). with G=1000, M=10 -> sqrt(40000) = 200px. Nice size.
+    const re = Math.sqrt(4 * G * config.blackHoleMass); 
     
     // Viewport transform helpers
     const toScreen = (v: Vector2) => ({
@@ -123,10 +125,12 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         const r2 = dx*dx + dy*dy;
         const r = Math.sqrt(r2);
         
-        if (r < 1) return p; // Avoid singularity
+        if (r < rs) return p; // Inside event horizon, don't lens outwards (simplified)
 
         // Displacement magnitude based on 4M/r (simplified Einstein deflection)
         // Visual approximation: push out by K / r
+        // Deflection angle ~ 4GM/c^2 * 1/b.
+        // We use Einstein Radius approx: alpha = RE^2 / r
         const deflection = (re * re) / r; 
         
         // New magnitude
@@ -199,15 +203,16 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     // --- DRAW ACCRETION DISK (Behind BH) ---
     // Simplified as a glowing gradient ring
     const screenCenter = toScreen({x: 0, y: 0});
-    const diskRad = rs * 4 * viewport.zoom;
+    // Visual size of disk
+    const diskRad = rs * 6 * viewport.zoom;
     
     const gradient = ctx.createRadialGradient(
       screenCenter.x, screenCenter.y, rs * viewport.zoom,
       screenCenter.x, screenCenter.y, diskRad
     );
     gradient.addColorStop(0, 'rgba(0,0,0,1)'); // Inner gap
-    gradient.addColorStop(0.1, 'rgba(255, 100, 0, 0.8)'); // Hot inner edge
-    gradient.addColorStop(0.4, 'rgba(200, 50, 0, 0.4)');
+    gradient.addColorStop(0.15, 'rgba(255, 100, 0, 0.9)'); // Hot inner edge
+    gradient.addColorStop(0.3, 'rgba(255, 50, 0, 0.6)');
     gradient.addColorStop(1, 'rgba(100, 0, 0, 0)');
 
     ctx.fillStyle = gradient;
@@ -220,8 +225,8 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         // Trail
         if (obj.trail.length > 1) {
             ctx.strokeStyle = obj.color;
-            ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.5;
+            ctx.lineWidth = 1 + (obj.mass / 10);
+            ctx.globalAlpha = 0.6;
             ctx.beginPath();
             obj.trail.forEach((pos, i) => {
                 const lensedPos = lensPoint(pos);
@@ -264,7 +269,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     ctx.fill();
 
     // Photon ring (thin white line around shadow)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     ctx.lineWidth = 1 * viewport.zoom;
     ctx.beginPath();
     ctx.arc(screenCenter.x, screenCenter.y, shadowRadius + 1, 0, Math.PI * 2);
@@ -336,6 +341,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         <div>Obj Count: {objects.length}</div>
         <div>Zoom: {viewport.zoom.toFixed(2)}x</div>
         <div>Offset: {viewport.offset.x.toFixed(0)}, {viewport.offset.y.toFixed(0)}</div>
+        <div className="text-amber-500/80 mt-2">BH Radius (Rs): {(config.blackHoleMass * RS_FACTOR).toFixed(1)}</div>
       </div>
     </div>
   );

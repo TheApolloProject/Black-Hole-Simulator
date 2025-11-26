@@ -3,7 +3,7 @@ import BlackHoleCanvas from './components/BlackHoleCanvas';
 import ControlPanel from './components/ControlPanel';
 import AIChat from './components/AIChat';
 import { SimulationConfig, CelestialObject, ViewportState, CelestialType } from './types';
-import { INITIAL_OBJECTS, PLANET_PRESETS, PlanetPresetKey, STAR_PRESETS, StarPresetKey, G } from './constants';
+import { INITIAL_OBJECTS, PLANET_PRESETS, PlanetPresetKey, STAR_PRESETS, StarPresetKey, G, RS_FACTOR } from './constants';
 import { MessageSquare } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -61,6 +61,51 @@ const App: React.FC = () => {
     };
 
     setObjects(prev => [...prev, newObj]);
+  };
+
+  const handleLaunchSlingshot = () => {
+    // Spawns an object on a hyperbolic trajectory designed to slingshot
+    const startX = -900;
+    const startY = 140; // Aim slightly off-center to miss event horizon
+    
+    // High velocity to ensure open orbit (hyperbolic)
+    const vx = 22; 
+    const vy = -1.5; // Slight downward drift to counteract attraction initially
+
+    const newObj: CelestialObject = {
+      id: `slingshot-${Date.now()}`,
+      type: CelestialType.COMET,
+      pos: { x: startX, y: startY },
+      vel: { x: vx, y: vy },
+      mass: 0.5,
+      radius: 4,
+      color: '#86efac', // Light Green to distinguish
+      trail: []
+    };
+
+    setObjects(prev => [...prev, newObj]);
+    // Center view if zoomed in too much
+    if (viewport.zoom > 1.5) {
+       setViewport(prev => ({ ...prev, zoom: 1.0, offset: { x: 0, y: 0 } }));
+    }
+  };
+
+  const handleBoost = () => {
+    // Apply a prograde burn (increase speed in direction of travel)
+    // "Oberth Effect": Burn is most efficient at high speed (periapsis)
+    setObjects(prev => prev.map(obj => {
+      // Don't boost static things if any (or clouds)
+      if (obj.type === CelestialType.GAS_CLOUD) return obj;
+
+      const boostFactor = 1.2; // 20% speed increase
+      return {
+        ...obj,
+        vel: {
+          x: obj.vel.x * boostFactor,
+          y: obj.vel.y * boostFactor
+        }
+      };
+    }));
   };
 
   const handleAddPlanet = (key: PlanetPresetKey) => {
@@ -149,6 +194,8 @@ const App: React.FC = () => {
         onAddObject={handleAddObject}
         onAddPlanet={handleAddPlanet}
         onAddStar={handleAddStar}
+        onLaunchSlingshot={handleLaunchSlingshot}
+        onBoost={handleBoost}
         isExpanded={isSidebarExpanded}
         toggleExpand={() => setIsSidebarExpanded(!isSidebarExpanded)}
       />

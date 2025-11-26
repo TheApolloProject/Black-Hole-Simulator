@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Play, Pause, RefreshCw, PlusCircle, Grid3X3, Eye, Zap, Globe, Sun } from 'lucide-react';
+import { Settings, Play, Pause, RefreshCw, PlusCircle, Grid3X3, Eye, Zap, Globe, Sun, Rocket, ChevronsUp } from 'lucide-react';
 import { SimulationConfig } from '../types';
 import { PLANET_PRESETS, PlanetPresetKey, STAR_PRESETS, StarPresetKey } from '../constants';
 
@@ -10,6 +10,8 @@ interface ControlPanelProps {
   onAddObject: () => void; // Adds Comet
   onAddPlanet: (key: PlanetPresetKey) => void;
   onAddStar: (key: StarPresetKey) => void;
+  onLaunchSlingshot: () => void;
+  onBoost: () => void;
   isExpanded: boolean;
   toggleExpand: () => void;
 }
@@ -21,6 +23,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onAddObject,
   onAddPlanet,
   onAddStar,
+  onLaunchSlingshot,
+  onBoost,
   isExpanded,
   toggleExpand 
 }) => {
@@ -77,6 +81,32 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   <RefreshCw size={18} />
                 </button>
               </div>
+            </div>
+
+            {/* Maneuvers Section */}
+            <div className="space-y-3">
+              <label className="text-xs uppercase tracking-wider text-green-400 font-semibold flex items-center gap-2">
+                <Rocket size={12}/> Maneuvers
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={onLaunchSlingshot}
+                  className="bg-gray-800 hover:bg-gray-700 border border-green-700/50 text-green-100 p-2 rounded text-xs flex flex-col items-center gap-1 transition"
+                >
+                   <Rocket size={16} className="text-green-400" />
+                   Launch Slingshot
+                </button>
+                <button 
+                  onClick={onBoost}
+                  className="bg-gray-800 hover:bg-gray-700 border border-amber-700/50 text-amber-100 p-2 rounded text-xs flex flex-col items-center gap-1 transition"
+                >
+                   <ChevronsUp size={16} className="text-amber-400" />
+                   Gravity Assist
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-500">
+                Launch a high-speed comet or boost existing objects.
+              </p>
             </div>
 
             {/* Black Hole Properties */}
@@ -199,7 +229,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             
             <div className="pt-4 border-t border-gray-800">
                <p className="text-xs text-gray-500 leading-relaxed">
-                  Tip: Drag with Left Mouse to pan. Scroll to zoom. The grid represents spacetime curvature.
+                  Tip: Use Maneuvers to test gravity assists. High velocity objects can escape the pull.
                </p>
             </div>
           </div>
