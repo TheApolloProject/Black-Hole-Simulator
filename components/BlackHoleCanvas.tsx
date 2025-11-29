@@ -81,6 +81,7 @@ interface BackgroundStar {
   twinklePhase: number;
   twinkleSpeed: number;
   color: string; // "r, g, b"
+  isNebula?: boolean;
 }
 
 const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({ 
@@ -95,31 +96,119 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
   
   const [hoverInfo, setHoverInfo] = useState<{ id: string, x: number, y: number } | null>(null);
 
-  // Initialize Background Stars
+  // Initialize Background Stars & Structures
   useEffect(() => {
     if (backgroundStars.current.length > 0) return;
     
     const stars: BackgroundStar[] = [];
-    const spread = 8000; 
-    const count = 2000;
-    const colors = [
+    const worldSize = 12000;
+    
+    // --- Helpers ---
+    
+    const randomRange = (min: number, max: number) => Math.random() * (max - min) + min;
+    const randomColor = (options: string[]) => options[Math.floor(Math.random() * options.length)];
+    
+    const addStar = (x: number, y: number, size: number, alpha: number, color: string, speedMod: number = 1.0, isNebula: boolean = false) => {
+        stars.push({
+            pos: { x, y },
+            size: size,
+            baseAlpha: alpha,
+            twinklePhase: Math.random() * Math.PI * 2,
+            twinkleSpeed: (0.2 + Math.random() * 0.8) * speedMod,
+            color: color,
+            isNebula
+        });
+    };
+
+    // 1. NEBULAE (Background Gas Clouds)
+    const createNebula = (cx: number, cy: number, radius: number, color: string, particles: number) => {
+        for(let i = 0; i < particles; i++) {
+            // Random point in circle
+            const r = Math.sqrt(Math.random()) * radius;
+            const theta = Math.random() * Math.PI * 2;
+            const x = cx + r * Math.cos(theta);
+            const y = cy + r * Math.sin(theta);
+            
+            // Large, faint puffs
+            addStar(x, y, randomRange(40, 100), randomRange(0.02, 0.05), color, 0.1, true);
+        }
+    };
+
+    // Generate a few large nebulae
+    createNebula(-3000, -2000, 1500, "50, 0, 80", 60); // Dark Purple
+    createNebula(4000, 3000, 2000, "0, 40, 60", 80);   // Deep Teal
+    createNebula(-2000, 5000, 1200, "80, 20, 20", 50); // Deep Red
+
+    // 2. GALAXIES
+    const createGalaxy = (cx: number, cy: number, radius: number, color: string) => {
+        const armCount = Math.floor(randomRange(2, 4));
+        const twist = randomRange(3, 6);
+        
+        // Core
+        for(let i=0; i<150; i++) {
+             const r = Math.random() * radius * 0.15;
+             const theta = Math.random() * Math.PI * 2;
+             addStar(cx + r*Math.cos(theta), cy + r*Math.sin(theta), randomRange(1, 2.5), randomRange(0.5, 0.9), "255, 240, 200");
+        }
+        
+        // Arms
+        for(let i=0; i<500; i++) {
+            const r = (i / 500) * radius;
+            const armOffset = (Math.floor(Math.random() * armCount) / armCount) * Math.PI * 2;
+            const curve = r * twist / radius;
+            const scatter = (Math.random() - 0.5) * (radius * 0.2); // Scatter increases with radius?
+            const angle = armOffset + curve;
+            
+            const x = cx + (r * Math.cos(angle)) + (Math.random()-0.5)*radius*0.1;
+            const y = cy + (r * Math.sin(angle)) + (Math.random()-0.5)*radius*0.1;
+            
+            const isBlue = Math.random() > 0.3;
+            const starColor = isBlue ? color : "255, 255, 255";
+            addStar(x, y, randomRange(0.8, 2.0), randomRange(0.3, 0.8), starColor);
+        }
+    };
+
+    createGalaxy(-3500, 2500, 1500, "150, 200, 255"); // Blue Spiral
+    createGalaxy(4500, -1500, 1200, "200, 220, 255"); // Smaller Spiral
+    createGalaxy(2000, 6000, 800, "255, 200, 200"); // Reddish Dwarf
+
+    // 3. STAR CLUSTERS
+    const createCluster = (cx: number, cy: number, count: number, spread: number, color: string) => {
+        for(let i=0; i<count; i++) {
+            // Gaussian-ish distribution
+            const r = spread * Math.sqrt(-2 * Math.log(Math.random())); // Box-Muller radius approximation
+            const theta = Math.random() * Math.PI * 2;
+            const x = cx + r * Math.cos(theta);
+            const y = cy + r * Math.sin(theta);
+            
+            addStar(x, y, randomRange(0.5, 2.0), randomRange(0.4, 0.9), color);
+        }
+    };
+
+    createCluster(-1500, -4000, 100, 300, "100, 200, 255"); // Pleiades-like
+    createCluster(3000, 1000, 150, 200, "255, 150, 50"); // Globular (orange)
+    createCluster(-5000, 1000, 80, 250, "255, 255, 255");
+    createCluster(1000, -5000, 120, 200, "200, 255, 200"); // Weird green one
+
+    // 4. BACKGROUND FIELD
+    const starColors = [
         "255, 255, 255", // White
         "200, 220, 255", // Blue-ish
         "255, 240, 200", // Yellow-ish
         "255, 200, 200"  // Red-ish
     ];
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < 2500; i++) {
         stars.push({
             pos: {
-                x: (Math.random() - 0.5) * 2 * spread,
-                y: (Math.random() - 0.5) * 2 * spread
+                x: (Math.random() - 0.5) * 2 * worldSize,
+                y: (Math.random() - 0.5) * 2 * worldSize
             },
             size: Math.random() * 1.5 + 0.5,
             baseAlpha: Math.random() * 0.6 + 0.1,
             twinklePhase: Math.random() * Math.PI * 2,
             twinkleSpeed: 0.2 + Math.random() * 0.8,
-            color: colors[Math.floor(Math.random() * colors.length)]
+            color: starColors[Math.floor(Math.random() * starColors.length)]
         });
     }
     backgroundStars.current = stars;
@@ -203,40 +292,75 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
       y: cy + (v.y + viewport.offset.y) * viewport.zoom
     });
 
-    // --- DRAW BACKGROUND STARS ---
+    // --- DRAW BACKGROUND STARS & STRUCTURES ---
     // Helper to draw a single star instance
     const drawStarInstance = (pos: Vector2, mag: number, star: BackgroundStar) => {
         const screenPos = toScreen(pos);
         
         // Optimization: Cull off-screen stars
-        if (screenPos.x < -10 || screenPos.x > w + 10 || screenPos.y < -10 || screenPos.y > h + 10) return;
+        // Increase cull margin for large nebula particles
+        const margin = star.isNebula ? 200 : 20;
+        if (screenPos.x < -margin || screenPos.x > w + margin || screenPos.y < -margin || screenPos.y > h + margin) return;
+
+        // --- Refined Twinkling Logic ---
+        
+        // 1. Distance Influence:
+        // Stars closer to BH twinkle more
+        const distSq = pos.x * pos.x + pos.y * pos.y;
+        const proximityFactor = Math.min(4.0, (rs * rs * 500) / (distSq + 100)); 
+
+        // 2. Brightness Influence:
+        const brightnessFactor = Math.sqrt(mag);
+
+        // Dynamic Speed
+        const dynamicSpeed = star.twinkleSpeed * (1 + proximityFactor + brightnessFactor * 0.5);
+
+        // Dynamic Intensity
+        // Nebulae shouldn't twinkle violently, just pulse slowly
+        const dynamicIntensity = star.isNebula ? 0.05 : (0.15 + (proximityFactor * 0.15));
 
         // Calculate Alpha
-        const alphaOffset = Math.sin(time * star.twinkleSpeed + star.twinklePhase) * 0.15;
-        // Modulate alpha by lensing magnification (stars get brighter when lensed)
-        const lensedAlpha = Math.min(1.0, star.baseAlpha * mag);
-        const currentAlpha = Math.max(0.1, Math.min(1.0, lensedAlpha + alphaOffset));
+        const noise = Math.sin(time * dynamicSpeed + star.twinklePhase) + 
+                      Math.sin(time * dynamicSpeed * 1.7 + star.twinklePhase) * 0.4;
+        
+        const alphaOffset = noise * dynamicIntensity;
+
+        // Modulate alpha by lensing magnification (flux conservation approximation)
+        // Nebulae magnify less visually to prevent washing out screen
+        const magEffect = star.isNebula ? Math.pow(mag, 0.3) : mag;
+        const lensedAlpha = Math.min(1.0, star.baseAlpha * magEffect);
+        
+        // Final Alpha
+        const currentAlpha = Math.max(0.01, Math.min(1.0, lensedAlpha + alphaOffset));
 
         // Draw
         ctx.fillStyle = `rgba(${star.color}, ${currentAlpha})`;
         ctx.beginPath();
-        // Scale star size by sqrt of magnification to represent flux conservation area
-        const r = Math.min(star.size * viewport.zoom * Math.sqrt(mag), 5);
-        ctx.arc(screenPos.x, screenPos.y, Math.max(0.5, r), 0, Math.PI * 2);
+        
+        // Scale star size
+        const pulse = 1 + alphaOffset * 0.3;
+        const maxR = star.isNebula ? 300 : 6;
+        const r = Math.min(star.size * viewport.zoom * Math.sqrt(magEffect) * pulse, maxR);
+        
+        ctx.arc(screenPos.x, screenPos.y, Math.max(0.2, r), 0, Math.PI * 2);
         ctx.fill();
     };
 
     backgroundStars.current.forEach(star => {
+        // Lensing
+        // For performance, maybe skip lensing calculation for very distant/faint stars?
+        // But for correctness, we keep it. 
         const lensing = calculateLensing(star.pos, config.blackHoleMass, config.showLensing);
         
         // Draw Primary Image
         drawStarInstance(lensing.pos, lensing.mag, star);
         
-        // Draw Secondary Image (if visible)
-        // Secondary images are inside the Einstein ring and usually fainter, 
-        // but become bright near the ring.
+        // Draw Secondary Image (if visible and not a huge nebula puff which might look weird inverted)
         if (config.showLensing && lensing.pos2 && lensing.mag2 > 0.02) {
-             drawStarInstance(lensing.pos2, lensing.mag2, star);
+             // Optional: Don't draw secondary images for nebulae to avoid clutter/artifacts in center
+             if (!star.isNebula) {
+                 drawStarInstance(lensing.pos2, lensing.mag2, star);
+             }
         }
     });
 
@@ -264,7 +388,6 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         let first = true;
         for (let y = minY; y <= maxY; y += 20) {
           const worldPos = { x, y };
-          // Use primary lensing for grid to avoid visual clutter of secondary grid
           const lensedWorld = calculateLensing(worldPos, config.blackHoleMass, config.showLensing).pos;
           const screenPos = toScreen(lensedWorld);
           
@@ -298,7 +421,6 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
     // --- DRAW ACCRETION DISK ---
     const screenCenter = toScreen({x: 0, y: 0});
-    // Visual tweak: make disk larger to interact with lensing more
     const diskRad = rs * 6 * viewport.zoom;
     
     const gradient = ctx.createRadialGradient(
