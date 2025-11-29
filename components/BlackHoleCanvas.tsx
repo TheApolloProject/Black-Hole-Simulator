@@ -32,6 +32,12 @@ interface BlackHoleCanvasProps {
   setViewport: React.Dispatch<React.SetStateAction<ViewportState>>;
 }
 
+interface BackgroundStar {
+  pos: Vector2;
+  size: number;
+  baseAlpha: number;
+}
+
 const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({ 
   config, objects, setObjects, viewport, setViewport 
 }) => {
@@ -40,8 +46,30 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
   const requestRef = useRef<number>(0);
   const isDragging = useRef(false);
   const lastMousePos = useRef<Vector2>({ x: 0, y: 0 });
+  const backgroundStars = useRef<BackgroundStar[]>([]);
   
   const [hoverInfo, setHoverInfo] = useState<{ id: string, x: number, y: number } | null>(null);
+
+  // Initialize Background Stars
+  useEffect(() => {
+    if (backgroundStars.current.length > 0) return;
+    
+    const stars: BackgroundStar[] = [];
+    const spread = 4000; // World units
+    const count = 1200;
+
+    for (let i = 0; i < count; i++) {
+        stars.push({
+            pos: {
+                x: (Math.random() - 0.5) * 2 * spread,
+                y: (Math.random() - 0.5) * 2 * spread
+            },
+            size: Math.random() * 1.5 + 0.5,
+            baseAlpha: Math.random() * 0.7 + 0.1
+        });
+    }
+    backgroundStars.current = stars;
+  }, []);
 
   // Physics Update Loop
   const updatePhysics = useCallback(() => {
@@ -109,6 +137,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     const cx = w / 2;
     const cy = h / 2;
 
+    // Clear Screen
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, w, h);
 
@@ -117,6 +146,22 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     const toScreen = (v: Vector2) => ({
       x: cx + (v.x + viewport.offset.x) * viewport.zoom,
       y: cy + (v.y + viewport.offset.y) * viewport.zoom
+    });
+
+    // --- DRAW BACKGROUND STARS ---
+    backgroundStars.current.forEach(star => {
+        const lensedPos = getLensedPosition(star.pos, config.blackHoleMass, config.showLensing);
+        const screenPos = toScreen(lensedPos);
+
+        // Optimization: Don't draw if off screen
+        if (screenPos.x < -5 || screenPos.x > w + 5 || screenPos.y < -5 || screenPos.y > h + 5) return;
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.baseAlpha})`;
+        ctx.beginPath();
+        // Scale star slightly with zoom but clamp it so they don't get huge
+        const r = Math.min(star.size * viewport.zoom * 0.8, 3);
+        ctx.arc(screenPos.x, screenPos.y, Math.max(0.5, r), 0, Math.PI * 2);
+        ctx.fill();
     });
 
     // --- DRAW GRID ---
