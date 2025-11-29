@@ -2,26 +2,68 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { G, RS_FACTOR, COLORS } from '../constants';
 import { CelestialObject, SimulationConfig, Vector2, ViewportState, CelestialType } from '../types';
 
-// Helper for lensing (shared between render and hit test)
-const getLensedPosition = (p: Vector2, mass: number, showLensing: boolean): Vector2 => {
-    if (!showLensing) return p;
+// Refined lensing calculation based on the gravitational lens equation
+// Returns the primary image position (pos) and secondary inverted image position (pos2)
+// along with their magnifications.
+const calculateLensing = (p: Vector2, mass: number, showLensing: boolean) => {
+    if (!showLensing) return { pos: p, mag: 1, pos2: null, mag2: 0 };
     
-    const rs = mass * RS_FACTOR;
-    // Einstein Radius RE = sqrt(4GM)
-    const re = Math.sqrt(4 * G * mass); 
+    // Einstein Radius (RE)
+    // RE = sqrt(4GM). We keep the constant G scaling from the simulation.
+    // This defines the scale of the lensing distortion.
+    const re = Math.sqrt(4 * G * mass);
+    const reSq = re * re;
     
     const rSq = p.x * p.x + p.y * p.y;
     const r = Math.sqrt(rSq);
     
-    if (r < rs) return p; // Inside event horizon
+    // Handle singularity/center case
+    if (r < 0.001) {
+        // Source is directly behind the BH. Forms an Einstein Ring at RE.
+        // We map the point to RE.
+        return { 
+            pos: { x: (p.x / r || 1) * re, y: (p.y / r || 0) * re }, 
+            mag: 1.0, 
+            pos2: null, 
+            mag2: 0 
+        };
+    }
 
-    // Deflection angle ~ 4GM/c^2 * 1/b (Visual approx)
-    const deflection = (re * re) / r; 
+    // Impact parameter normalized to Einstein radius
+    const u = r / re;
+    const uSq = u * u;
+    const root = Math.sqrt(uSq + 4);
     
-    const rNew = r + deflection;
-    const scale = rNew / r;
+    // Magnification (μ)
+    // Total magnification μ = (u^2 + 2) / (2u * sqrt(u^2 + 4))
+    // We split this into primary (+) and secondary (-) image contributions
+    const A = (uSq + 2) / (2 * u * root);
+    // Clamp magnification to prevent visual artifacts
+    const mag1 = Math.min(A + 0.5, 8.0);
+    const mag2 = Math.min(A - 0.5, 8.0);
+
+    // Primary Image (Outer): theta_+ = (beta + sqrt(beta^2 + 4*theta_E^2)) / 2
+    // Reduces to: (r + sqrt(r^2 + 4*re^2)) / 2
+    const theta1 = (r + Math.sqrt(rSq + 4 * reSq)) / 2;
+    const scale1 = theta1 / r;
     
-    return { x: p.x * scale, y: p.y * scale };
+    // Secondary Image (Inner): theta_- = (beta - sqrt(beta^2 + 4*theta_E^2)) / 2
+    // This image is on the opposite side, so the radius is negative relative to 'r' vector
+    const theta2 = (r - Math.sqrt(rSq + 4 * reSq)) / 2;
+    const scale2 = theta2 / r;
+
+    return {
+        pos: { x: p.x * scale1, y: p.y * scale1 },
+        mag: mag1,
+        pos2: { x: p.x * scale2, y: p.y * scale2 },
+        mag2: mag2
+    };
+};
+
+// Legacy wrapper for compatibility with existing code that expects just a Vector2
+// Uses the primary image position
+const getLensedPosition = (p: Vector2, mass: number, showLensing: boolean): Vector2 => {
+    return calculateLensing(p, mass, showLensing).pos;
 };
 
 interface BlackHoleCanvasProps {
@@ -36,6 +78,9 @@ interface BackgroundStar {
   pos: Vector2;
   size: number;
   baseAlpha: number;
+  twinklePhase: number;
+  twinkleSpeed: number;
+  color: string; // "r, g, b"
 }
 
 const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({ 
@@ -55,8 +100,14 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     if (backgroundStars.current.length > 0) return;
     
     const stars: BackgroundStar[] = [];
-    const spread = 4000; // World units
-    const count = 1200;
+    const spread = 8000; 
+    const count = 2000;
+    const colors = [
+        "255, 255, 255", // White
+        "200, 220, 255", // Blue-ish
+        "255, 240, 200", // Yellow-ish
+        "255, 200, 200"  // Red-ish
+    ];
 
     for (let i = 0; i < count; i++) {
         stars.push({
@@ -65,7 +116,10 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
                 y: (Math.random() - 0.5) * 2 * spread
             },
             size: Math.random() * 1.5 + 0.5,
-            baseAlpha: Math.random() * 0.7 + 0.1
+            baseAlpha: Math.random() * 0.6 + 0.1,
+            twinklePhase: Math.random() * Math.PI * 2,
+            twinkleSpeed: 0.2 + Math.random() * 0.8,
+            color: colors[Math.floor(Math.random() * colors.length)]
         });
     }
     backgroundStars.current = stars;
@@ -136,6 +190,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     const h = canvas.height;
     const cx = w / 2;
     const cy = h / 2;
+    const time = performance.now() / 1000;
 
     // Clear Screen
     ctx.fillStyle = COLORS.background;
@@ -149,19 +204,40 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     });
 
     // --- DRAW BACKGROUND STARS ---
-    backgroundStars.current.forEach(star => {
-        const lensedPos = getLensedPosition(star.pos, config.blackHoleMass, config.showLensing);
-        const screenPos = toScreen(lensedPos);
+    // Helper to draw a single star instance
+    const drawStarInstance = (pos: Vector2, mag: number, star: BackgroundStar) => {
+        const screenPos = toScreen(pos);
+        
+        // Optimization: Cull off-screen stars
+        if (screenPos.x < -10 || screenPos.x > w + 10 || screenPos.y < -10 || screenPos.y > h + 10) return;
 
-        // Optimization: Don't draw if off screen
-        if (screenPos.x < -5 || screenPos.x > w + 5 || screenPos.y < -5 || screenPos.y > h + 5) return;
+        // Calculate Alpha
+        const alphaOffset = Math.sin(time * star.twinkleSpeed + star.twinklePhase) * 0.15;
+        // Modulate alpha by lensing magnification (stars get brighter when lensed)
+        const lensedAlpha = Math.min(1.0, star.baseAlpha * mag);
+        const currentAlpha = Math.max(0.1, Math.min(1.0, lensedAlpha + alphaOffset));
 
-        ctx.fillStyle = `rgba(255, 255, 255, ${star.baseAlpha})`;
+        // Draw
+        ctx.fillStyle = `rgba(${star.color}, ${currentAlpha})`;
         ctx.beginPath();
-        // Scale star slightly with zoom but clamp it so they don't get huge
-        const r = Math.min(star.size * viewport.zoom * 0.8, 3);
+        // Scale star size by sqrt of magnification to represent flux conservation area
+        const r = Math.min(star.size * viewport.zoom * Math.sqrt(mag), 5);
         ctx.arc(screenPos.x, screenPos.y, Math.max(0.5, r), 0, Math.PI * 2);
         ctx.fill();
+    };
+
+    backgroundStars.current.forEach(star => {
+        const lensing = calculateLensing(star.pos, config.blackHoleMass, config.showLensing);
+        
+        // Draw Primary Image
+        drawStarInstance(lensing.pos, lensing.mag, star);
+        
+        // Draw Secondary Image (if visible)
+        // Secondary images are inside the Einstein ring and usually fainter, 
+        // but become bright near the ring.
+        if (config.showLensing && lensing.pos2 && lensing.mag2 > 0.02) {
+             drawStarInstance(lensing.pos2, lensing.mag2, star);
+        }
     });
 
     // --- DRAW GRID ---
@@ -183,11 +259,13 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
       ctx.beginPath();
       
+      // Vertical Lines
       for (let x = startX; x <= maxX; x += gridSize) {
         let first = true;
         for (let y = minY; y <= maxY; y += 20) {
           const worldPos = { x, y };
-          const lensedWorld = getLensedPosition(worldPos, config.blackHoleMass, config.showLensing);
+          // Use primary lensing for grid to avoid visual clutter of secondary grid
+          const lensedWorld = calculateLensing(worldPos, config.blackHoleMass, config.showLensing).pos;
           const screenPos = toScreen(lensedWorld);
           
           if (first) {
@@ -199,11 +277,12 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         }
       }
 
+      // Horizontal Lines
       for (let y = startY; y <= maxY; y += gridSize) {
         let first = true;
         for (let x = minX; x <= maxX; x += 20) {
           const worldPos = { x, y };
-          const lensedWorld = getLensedPosition(worldPos, config.blackHoleMass, config.showLensing);
+          const lensedWorld = calculateLensing(worldPos, config.blackHoleMass, config.showLensing).pos;
           const screenPos = toScreen(lensedWorld);
           
           if (first) {
@@ -219,6 +298,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
     // --- DRAW ACCRETION DISK ---
     const screenCenter = toScreen({x: 0, y: 0});
+    // Visual tweak: make disk larger to interact with lensing more
     const diskRad = rs * 6 * viewport.zoom;
     
     const gradient = ctx.createRadialGradient(
@@ -237,6 +317,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
     // --- DRAW OBJECTS ---
     objects.forEach(obj => {
+        // Trail
         if (obj.trail.length > 1) {
             ctx.strokeStyle = obj.color;
             ctx.lineWidth = 1 + (obj.mass / 10);
@@ -252,6 +333,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
             ctx.globalAlpha = 1.0;
         }
 
+        // Body
         const lensedPos = getLensedPosition(obj.pos, config.blackHoleMass, config.showLensing);
         const screenPos = toScreen(lensedPos);
         
@@ -265,7 +347,9 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         ctx.shadowBlur = 0;
     });
 
-    // --- DRAW SHADOW ---
+    // --- DRAW SHADOW (Event Horizon) ---
+    // The "Shadow" is the apparent size of the black hole, which is ~2.6 * Rs (3 * sqrt(3) / 2)
+    // We draw this last to ensure it occludes everything behind it, including lensed stars
     const shadowRadius = rs * 2.6 * viewport.zoom;
     
     ctx.fillStyle = '#000000';
@@ -273,10 +357,11 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     ctx.arc(screenCenter.x, screenCenter.y, shadowRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    // Photon Ring / Accretion Edge
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
     ctx.lineWidth = 1 * viewport.zoom;
     ctx.beginPath();
-    ctx.arc(screenCenter.x, screenCenter.y, shadowRadius + 1, 0, Math.PI * 2);
+    ctx.arc(screenCenter.x, screenCenter.y, shadowRadius, 0, Math.PI * 2);
     ctx.stroke();
 
   }, [config, objects, viewport]);
@@ -388,13 +473,17 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         className="block touch-none"
       />
       
-      {/* Overlay Info */}
+      {/* Overlay Info - Debug (Top Left) */}
       <div className="absolute top-4 left-4 pointer-events-none select-none text-xs font-mono text-cyan-500/80 space-y-1 z-10">
         <div>Frame Time: 16.6ms (60 FPS)</div>
         <div>Obj Count: {objects.length}</div>
+      </div>
+
+      {/* Overlay Info - Navigation (Bottom Left) */}
+      <div className="absolute bottom-4 left-4 pointer-events-none select-none text-xs font-mono text-gray-400 space-y-1 z-10 bg-black/40 p-2 rounded backdrop-blur-sm border border-white/5">
         <div>Zoom: {viewport.zoom.toFixed(2)}x</div>
         <div>Offset: {viewport.offset.x.toFixed(0)}, {viewport.offset.y.toFixed(0)}</div>
-        <div className="text-amber-500/80 mt-2">BH Radius (Rs): {(config.blackHoleMass * RS_FACTOR).toFixed(1)}</div>
+        <div className="text-amber-500/80">BH Radius (Rs): {(config.blackHoleMass * RS_FACTOR).toFixed(1)}</div>
       </div>
 
       {/* Hover Tooltip */}
