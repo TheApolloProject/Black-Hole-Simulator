@@ -281,17 +281,33 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     const cy = h / 2;
     const time = performance.now() / 1000;
 
+    // Precalculate Rotation Params
+    const cos = Math.cos(viewport.rotation);
+    const sin = Math.sin(viewport.rotation);
+
+    // Screen Projection with Rotation
+    const toScreen = (v: Vector2) => {
+        // 1. Translate world to camera relative
+        const rx = v.x + viewport.offset.x;
+        const ry = v.y + viewport.offset.y;
+        
+        // 2. Rotate around camera center (0,0)
+        const rotX = rx * cos - ry * sin;
+        const rotY = rx * sin + ry * cos;
+        
+        // 3. Scale and Translate to Screen Center
+        return {
+          x: cx + rotX * viewport.zoom,
+          y: cy + rotY * viewport.zoom
+        };
+    };
+
     // Clear Screen
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, w, h);
 
     const rs = config.blackHoleMass * RS_FACTOR; 
     
-    const toScreen = (v: Vector2) => ({
-      x: cx + (v.x + viewport.offset.x) * viewport.zoom,
-      y: cy + (v.y + viewport.offset.y) * viewport.zoom
-    });
-
     // --- DRAW BACKGROUND STARS & STRUCTURES ---
     // Helper to draw a single star instance
     const drawStarInstance = (pos: Vector2, mag: number, star: BackgroundStar) => {
@@ -370,13 +386,14 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
       ctx.lineWidth = 1;
       
       const gridSize = config.gridDensity;
-      const rangeX = w / viewport.zoom / 2 + 100; 
-      const rangeY = h / viewport.zoom / 2 + 100;
+      // Calculate a safe range to cover the screen regardless of rotation
+      const diag = Math.sqrt(w * w + h * h);
+      const range = diag / viewport.zoom / 2 + 200;
       
-      const minX = -rangeX - viewport.offset.x;
-      const maxX = rangeX - viewport.offset.x;
-      const minY = -rangeY - viewport.offset.y;
-      const maxY = rangeY - viewport.offset.y;
+      const minX = -range - viewport.offset.x;
+      const maxX = range - viewport.offset.x;
+      const minY = -range - viewport.offset.y;
+      const maxY = range - viewport.offset.y;
 
       const startX = Math.floor(minX / gridSize) * gridSize;
       const startY = Math.floor(minY / gridSize) * gridSize;
@@ -386,7 +403,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
       // Vertical Lines
       for (let x = startX; x <= maxX; x += gridSize) {
         let first = true;
-        for (let y = minY; y <= maxY; y += 20) {
+        for (let y = minY; y <= maxY; y += 40) { // Optimize step for performance
           const worldPos = { x, y };
           const lensedWorld = calculateLensing(worldPos, config.blackHoleMass, config.showLensing).pos;
           const screenPos = toScreen(lensedWorld);
@@ -403,7 +420,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
       // Horizontal Lines
       for (let y = startY; y <= maxY; y += gridSize) {
         let first = true;
-        for (let x = minX; x <= maxX; x += 20) {
+        for (let x = minX; x <= maxX; x += 40) {
           const worldPos = { x, y };
           const lensedWorld = calculateLensing(worldPos, config.blackHoleMass, config.showLensing).pos;
           const screenPos = toScreen(lensedWorld);
@@ -508,15 +525,28 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    const cos = Math.cos(viewport.rotation);
+    const sin = Math.sin(viewport.rotation);
+
     if (isDragging.current) {
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
         
+        // Panning needs to adjust for rotation.
+        // We need to rotate the screen delta vector into the world-aligned camera space.
+        // Screen Delta Vector (dx, dy)
+        // Inverse Rotation (Screen -> World): Rot(-angle)
+        // x' = x cos(-a) - y sin(-a) = x cos(a) + y sin(a)
+        // y' = x sin(-a) + y cos(-a) = -x sin(a) + y cos(a)
+
+        const dWorldX = (dx * cos + dy * sin) / viewport.zoom;
+        const dWorldY = (-dx * sin + dy * cos) / viewport.zoom;
+
         setViewport(prev => ({
             ...prev,
             offset: {
-                x: prev.offset.x + dx / prev.zoom,
-                y: prev.offset.y + dy / prev.zoom
+                x: prev.offset.x + dWorldX,
+                y: prev.offset.y + dWorldY
             }
         }));
         lastMousePos.current = { x: e.clientX, y: e.clientY };
@@ -544,8 +574,14 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
         const lensedPos = getLensedPosition(obj.pos, config.blackHoleMass, config.showLensing);
         
-        const sx = cx + (lensedPos.x + viewport.offset.x) * viewport.zoom;
-        const sy = cy + (lensedPos.y + viewport.offset.y) * viewport.zoom;
+        // Manual toScreen calculation (must match render logic)
+        const rx = lensedPos.x + viewport.offset.x;
+        const ry = lensedPos.y + viewport.offset.y;
+        const rotX = rx * cos - ry * sin;
+        const rotY = rx * sin + ry * cos;
+        
+        const sx = cx + rotX * viewport.zoom;
+        const sy = cy + rotY * viewport.zoom;
         
         const dist = Math.hypot(mx - sx, my - sy);
         const radius = Math.max(obj.radius * viewport.zoom, 8); 
@@ -605,6 +641,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
       <div className="absolute bottom-4 left-4 pointer-events-none select-none text-xs font-mono text-gray-400 space-y-1 z-10 bg-black/40 p-2 rounded backdrop-blur-sm border border-white/5">
         <div>Zoom: {viewport.zoom.toFixed(2)}x</div>
         <div>Offset: {viewport.offset.x.toFixed(0)}, {viewport.offset.y.toFixed(0)}</div>
+        <div>Rot: {(viewport.rotation * 180 / Math.PI).toFixed(0)}°</div>
         <div className="text-amber-500/80">BH Radius (Rs): {(config.blackHoleMass * RS_FACTOR).toFixed(1)}</div>
       </div>
 

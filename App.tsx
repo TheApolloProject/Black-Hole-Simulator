@@ -190,6 +190,8 @@ const App: React.FC = () => {
       <ControlPanel 
         config={config} 
         setConfig={setConfig} 
+        viewport={viewport}
+        setViewport={setViewport}
         onReset={handleReset}
         onAddObject={handleAddObject}
         onAddPlanet={handleAddPlanet}

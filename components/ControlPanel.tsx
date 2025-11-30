@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Settings, Play, Pause, RefreshCw, PlusCircle, Grid3X3, Eye, Zap, Globe, Sun, Rocket, ChevronsUp } from 'lucide-react';
-import { SimulationConfig } from '../types';
+import { Settings, Play, Pause, RefreshCw, PlusCircle, Grid3X3, Eye, Zap, Globe, Sun, Rocket, ChevronsUp, Compass } from 'lucide-react';
+import { SimulationConfig, ViewportState } from '../types';
 import { PLANET_PRESETS, PlanetPresetKey, STAR_PRESETS, StarPresetKey } from '../constants';
 
 interface ControlPanelProps {
   config: SimulationConfig;
   setConfig: React.Dispatch<React.SetStateAction<SimulationConfig>>;
+  viewport: ViewportState;
+  setViewport: React.Dispatch<React.SetStateAction<ViewportState>>;
   onReset: () => void;
   onAddObject: () => void; // Adds Comet
   onAddPlanet: (key: PlanetPresetKey) => void;
@@ -19,6 +21,8 @@ interface ControlPanelProps {
 const ControlPanel: React.FC<ControlPanelProps> = ({ 
   config, 
   setConfig, 
+  viewport,
+  setViewport,
   onReset, 
   onAddObject,
   onAddPlanet,
@@ -33,6 +37,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   
   const updateConfig = <K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) => {
     setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateRotation = (degrees: number) => {
+    setViewport(prev => ({ ...prev, rotation: degrees * (Math.PI / 180) }));
   };
 
   return (
@@ -156,6 +164,19 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     type="range" min="0.1" max="5.0" step="0.1"
                     value={config.timeScale}
                     onChange={(e) => updateConfig('timeScale', parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                 />
+               </div>
+
+               <div>
+                 <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-300 flex items-center gap-2"><Compass size={14}/> Camera Rotation</span>
+                    <span className="text-cyan-400 font-mono">{(viewport.rotation * 180 / Math.PI).toFixed(0)}°</span>
+                 </div>
+                 <input 
+                    type="range" min="0" max="360" step="5"
+                    value={(viewport.rotation * 180 / Math.PI) % 360}
+                    onChange={(e) => updateRotation(parseFloat(e.target.value))}
                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
                  />
                </div>
