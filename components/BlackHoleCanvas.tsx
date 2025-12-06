@@ -129,7 +129,8 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
             const x = cx + r * Math.cos(theta);
             const y = cy + r * Math.sin(theta);
             
-            // Large, faint puffs
+            // Large, faint puffs. 
+            // We use huge sizes (40-100) and very low alpha (0.02-0.05) to create a cloud effect
             addStar(x, y, randomRange(40, 100), randomRange(0.02, 0.05), color, 0.1, true);
         }
     };
@@ -156,7 +157,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
             const r = (i / 500) * radius;
             const armOffset = (Math.floor(Math.random() * armCount) / armCount) * Math.PI * 2;
             const curve = r * twist / radius;
-            const scatter = (Math.random() - 0.5) * (radius * 0.2); // Scatter increases with radius?
+            // const scatter = (Math.random() - 0.5) * (radius * 0.2);
             const angle = armOffset + curve;
             
             const x = cx + (r * Math.cos(angle)) + (Math.random()-0.5)*radius*0.1;
