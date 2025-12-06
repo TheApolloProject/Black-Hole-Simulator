@@ -99,6 +99,10 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
   const lastMousePos = useRef<Vector2>({ x: 0, y: 0 });
   const backgroundStars = useRef<BackgroundStar[]>([]);
   
+  // Animation state Refs
+  const galaxyRotationAccumulator = useRef(0);
+  const lastTimeRef = useRef(0);
+  
   const [hoverInfo, setHoverInfo] = useState<{ id: string, x: number, y: number } | null>(null);
 
   // Initialize Background Stars & Structures
@@ -111,7 +115,6 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     // --- Helpers ---
     
     const randomRange = (min: number, max: number) => Math.random() * (max - min) + min;
-    const randomColor = (options: string[]) => options[Math.floor(Math.random() * options.length)];
     
     const addStar = (x: number, y: number, size: number, alpha: number, color: string, speedMod: number = 1.0, isNebula: boolean = false, isGalaxy: boolean = false, orbitCenter?: Vector2) => {
         let orbitRadius = 0;
@@ -214,22 +217,22 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         "255, 220, 200"  // Orange-ish
     ];
 
-    // Increased count for realistic density
-    for (let i = 0; i < 6000; i++) {
+    // Increased count for highly realistic sky density (8000 stars)
+    for (let i = 0; i < 8000; i++) {
         const sizeRoll = Math.random();
         let size;
         let brightness;
         
         // Distribution for realistic sky: Many faint tiny stars, few bright ones
-        if (sizeRoll > 0.98) {
-            size = Math.random() * 2.0 + 1.0; // Rare bright stars
+        if (sizeRoll > 0.99) {
+            size = Math.random() * 2.5 + 1.2; // Rare bright stars
             brightness = Math.random() * 0.4 + 0.6;
-        } else if (sizeRoll > 0.8) {
-            size = Math.random() * 1.0 + 0.5; // Medium stars
+        } else if (sizeRoll > 0.9) {
+            size = Math.random() * 1.5 + 0.6; // Medium stars
             brightness = Math.random() * 0.3 + 0.4;
         } else {
-            size = Math.random() * 0.5 + 0.2; // Faint background stars
-            brightness = Math.random() * 0.3 + 0.1;
+            size = Math.random() * 0.6 + 0.2; // Faint background stars
+            brightness = Math.random() * 0.4 + 0.1;
         }
 
         stars.push({
@@ -319,7 +322,17 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     const h = canvas.height;
     const cx = w / 2;
     const cy = h / 2;
-    const time = performance.now() / 1000;
+    
+    // Time tracking for smooth animation
+    const now = performance.now() / 1000;
+    // Initial ref setup
+    if (lastTimeRef.current === 0) lastTimeRef.current = now;
+    const dt = now - lastTimeRef.current;
+    lastTimeRef.current = now;
+
+    // Smoothly accumulate galaxy rotation
+    // 0.2 rad/sec base speed multiplier
+    galaxyRotationAccumulator.current += dt * config.galaxyRotationSpeed * 0.2;
 
     // Precalculate Rotation Params
     const cos = Math.cos(viewport.rotation);
@@ -364,8 +377,8 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         const dynamicSpeed = star.twinkleSpeed * (1 + proximityFactor + brightnessFactor * 0.5);
         const dynamicIntensity = star.isNebula ? 0.05 : (0.15 + (proximityFactor * 0.15));
 
-        const noise = Math.sin(time * dynamicSpeed + star.twinklePhase) + 
-                      Math.sin(time * dynamicSpeed * 1.7 + star.twinklePhase) * 0.4;
+        const noise = Math.sin(now * dynamicSpeed + star.twinklePhase) + 
+                      Math.sin(now * dynamicSpeed * 1.7 + star.twinklePhase) * 0.4;
         
         const alphaOffset = noise * dynamicIntensity;
         const magEffect = star.isNebula ? Math.pow(mag, 0.3) : mag;
@@ -383,17 +396,12 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         ctx.fill();
     };
 
-    // Calculate rotation offset for galaxies
-    // Use a scaler so the slider values (0-2) feel right.
-    // 0.2 rad/sec is a good base speed.
-    const galaxyRotationOffset = time * config.galaxyRotationSpeed * 0.2; 
-
     backgroundStars.current.forEach(star => {
         let currentPos = star.pos;
 
-        // Apply Galaxy Rotation if applicable
+        // Apply Galaxy Rotation if applicable (using accumulated smooth rotation)
         if (star.isGalaxy && star.orbitCenter && star.orbitRadius !== undefined && star.initialAngle !== undefined) {
-            const currentAngle = star.initialAngle + galaxyRotationOffset;
+            const currentAngle = star.initialAngle + galaxyRotationAccumulator.current;
             currentPos = {
                 x: star.orbitCenter.x + star.orbitRadius * Math.cos(currentAngle),
                 y: star.orbitCenter.y + star.orbitRadius * Math.sin(currentAngle)
@@ -563,6 +571,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
         
+        // Inverse Rotation for panning
         const dWorldX = (dx * cos + dy * sin) / viewport.zoom;
         const dWorldY = (-dx * sin + dy * cos) / viewport.zoom;
 
