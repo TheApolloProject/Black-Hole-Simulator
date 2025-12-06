@@ -219,7 +219,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     if (config.isPaused) return;
 
     setObjects(prevObjects => {
-      const dt = 0.016 * config.timeScale; 
+      const baseDt = 0.016 * config.timeScale; 
       const rs = config.blackHoleMass * RS_FACTOR;
       
       return prevObjects.map(obj => {
@@ -228,6 +228,16 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
         if (dist < rs) {
           return { ...obj, type: CelestialType.GAS_CLOUD, radius: 0, mass: 0 }; 
+        }
+
+        let dt = baseDt;
+        if (config.enableTimeDilation) {
+            // Gravitational Time Dilation: t' = t * sqrt(1 - Rs/r)
+            // As r -> Rs, t' -> 0 (time stops)
+            // We clamp the ratio to 0.99 to prevent numerical issues at the very edge before the object is consumed
+            const ratio = Math.min(0.99, rs / dist);
+            const dilationFactor = Math.sqrt(1 - ratio);
+            dt = baseDt * dilationFactor;
         }
 
         const forceMag = (G * config.blackHoleMass) / distSq;
@@ -258,7 +268,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         };
       }).filter(o => o.mass > 0);
     });
-  }, [config.isPaused, config.timeScale, config.blackHoleMass, setObjects]);
+  }, [config.isPaused, config.timeScale, config.blackHoleMass, config.enableTimeDilation, setObjects]);
 
   // Render Loop
   const render = useCallback(() => {
@@ -672,6 +682,14 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
                 <span>Distance:</span>
                 <span className="text-amber-300">{Math.hypot(hoveredObj.pos.x, hoveredObj.pos.y).toFixed(0)} au</span>
               </div>
+              {config.enableTimeDilation && (
+                 <div className="flex justify-between text-gray-400">
+                    <span>Time Rate:</span>
+                    <span className="text-purple-300">{
+                        Math.sqrt(Math.max(0, 1 - (config.blackHoleMass * RS_FACTOR) / Math.max(config.blackHoleMass * RS_FACTOR + 0.1, Math.hypot(hoveredObj.pos.x, hoveredObj.pos.y)))).toFixed(3)
+                    }x</span>
+                 </div>
+              )}
            </div>
         </div>
       )}

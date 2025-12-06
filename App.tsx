@@ -14,6 +14,7 @@ const App: React.FC = () => {
     gridDensity: 60,
     showGrid: true,
     showLensing: true,
+    enableTimeDilation: true,
     renderMode: 'full',
     isPaused: false
   });

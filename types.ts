@@ -27,6 +27,7 @@ export interface SimulationConfig {
   gridDensity: number;
   showGrid: boolean;
   showLensing: boolean;
+  enableTimeDilation: boolean;
   renderMode: 'full' | 'wireframe' | 'simple';
   isPaused: boolean;
 }
