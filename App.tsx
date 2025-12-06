@@ -15,6 +15,7 @@ const App: React.FC = () => {
     showGrid: true,
     showLensing: true,
     enableTimeDilation: true,
+    galaxyRotationSpeed: 0.2, // Default gentle rotation
     renderMode: 'full',
     isPaused: false
   });
@@ -34,7 +35,7 @@ const App: React.FC = () => {
   const handleReset = () => {
     setObjects([...INITIAL_OBJECTS]);
     setViewport({ offset: { x: 0, y: 0 }, zoom: 1.0, rotation: 0 });
-    setConfig(prev => ({ ...prev, blackHoleMass: 10, timeScale: 1.0 }));
+    setConfig(prev => ({ ...prev, blackHoleMass: 10, timeScale: 1.0, galaxyRotationSpeed: 0.2 }));
   };
 
   const handleAddObject = () => {

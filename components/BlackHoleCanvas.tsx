@@ -82,6 +82,11 @@ interface BackgroundStar {
   twinkleSpeed: number;
   color: string; // "r, g, b"
   isNebula?: boolean;
+  isGalaxy?: boolean;
+  // Orbit Data for rotation
+  orbitCenter?: Vector2;
+  orbitRadius?: number;
+  initialAngle?: number;
 }
 
 const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({ 
@@ -101,14 +106,24 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     if (backgroundStars.current.length > 0) return;
     
     const stars: BackgroundStar[] = [];
-    const worldSize = 12000;
+    const worldSize = 14000;
     
     // --- Helpers ---
     
     const randomRange = (min: number, max: number) => Math.random() * (max - min) + min;
     const randomColor = (options: string[]) => options[Math.floor(Math.random() * options.length)];
     
-    const addStar = (x: number, y: number, size: number, alpha: number, color: string, speedMod: number = 1.0, isNebula: boolean = false) => {
+    const addStar = (x: number, y: number, size: number, alpha: number, color: string, speedMod: number = 1.0, isNebula: boolean = false, isGalaxy: boolean = false, orbitCenter?: Vector2) => {
+        let orbitRadius = 0;
+        let initialAngle = 0;
+
+        if (isGalaxy && orbitCenter) {
+           const dx = x - orbitCenter.x;
+           const dy = y - orbitCenter.y;
+           orbitRadius = Math.sqrt(dx * dx + dy * dy);
+           initialAngle = Math.atan2(dy, dx);
+        }
+
         stars.push({
             pos: { x, y },
             size: size,
@@ -116,48 +131,48 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
             twinklePhase: Math.random() * Math.PI * 2,
             twinkleSpeed: (0.2 + Math.random() * 0.8) * speedMod,
             color: color,
-            isNebula
+            isNebula,
+            isGalaxy,
+            orbitCenter,
+            orbitRadius,
+            initialAngle
         });
     };
 
-    // 1. NEBULAE (Background Gas Clouds)
+    // 1. NEBULAE (Background Gas Clouds) - Static
     const createNebula = (cx: number, cy: number, radius: number, color: string, particles: number) => {
         for(let i = 0; i < particles; i++) {
-            // Random point in circle
             const r = Math.sqrt(Math.random()) * radius;
             const theta = Math.random() * Math.PI * 2;
             const x = cx + r * Math.cos(theta);
             const y = cy + r * Math.sin(theta);
             
-            // Large, faint puffs. 
-            // We use huge sizes (40-100) and very low alpha (0.02-0.05) to create a cloud effect
             addStar(x, y, randomRange(40, 100), randomRange(0.02, 0.05), color, 0.1, true);
         }
     };
 
-    // Generate a few large nebulae
-    createNebula(-3000, -2000, 1500, "50, 0, 80", 60); // Dark Purple
-    createNebula(4000, 3000, 2000, "0, 40, 60", 80);   // Deep Teal
-    createNebula(-2000, 5000, 1200, "80, 20, 20", 50); // Deep Red
+    createNebula(-3000, -2000, 1500, "50, 0, 80", 60); 
+    createNebula(4000, 3000, 2000, "0, 40, 60", 80);   
+    createNebula(-2000, 5000, 1200, "80, 20, 20", 50); 
 
-    // 2. GALAXIES
+    // 2. GALAXIES - Rotating
     const createGalaxy = (cx: number, cy: number, radius: number, color: string) => {
         const armCount = Math.floor(randomRange(2, 4));
         const twist = randomRange(3, 6);
+        const orbitCenter = { x: cx, y: cy };
         
         // Core
-        for(let i=0; i<150; i++) {
+        for(let i=0; i<200; i++) {
              const r = Math.random() * radius * 0.15;
              const theta = Math.random() * Math.PI * 2;
-             addStar(cx + r*Math.cos(theta), cy + r*Math.sin(theta), randomRange(1, 2.5), randomRange(0.5, 0.9), "255, 240, 200");
+             addStar(cx + r*Math.cos(theta), cy + r*Math.sin(theta), randomRange(1, 2.5), randomRange(0.5, 0.9), "255, 240, 200", 1.0, false, true, orbitCenter);
         }
         
         // Arms
-        for(let i=0; i<500; i++) {
-            const r = (i / 500) * radius;
+        for(let i=0; i<600; i++) {
+            const r = (i / 600) * radius;
             const armOffset = (Math.floor(Math.random() * armCount) / armCount) * Math.PI * 2;
             const curve = r * twist / radius;
-            // const scatter = (Math.random() - 0.5) * (radius * 0.2);
             const angle = armOffset + curve;
             
             const x = cx + (r * Math.cos(angle)) + (Math.random()-0.5)*radius*0.1;
@@ -165,7 +180,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
             
             const isBlue = Math.random() > 0.3;
             const starColor = isBlue ? color : "255, 255, 255";
-            addStar(x, y, randomRange(0.8, 2.0), randomRange(0.3, 0.8), starColor);
+            addStar(x, y, randomRange(0.8, 2.0), randomRange(0.3, 0.8), starColor, 1.0, false, true, orbitCenter);
         }
     };
 
@@ -173,11 +188,10 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     createGalaxy(4500, -1500, 1200, "200, 220, 255"); // Smaller Spiral
     createGalaxy(2000, 6000, 800, "255, 200, 200"); // Reddish Dwarf
 
-    // 3. STAR CLUSTERS
+    // 3. STAR CLUSTERS - Static
     const createCluster = (cx: number, cy: number, count: number, spread: number, color: string) => {
         for(let i=0; i<count; i++) {
-            // Gaussian-ish distribution
-            const r = spread * Math.sqrt(-2 * Math.log(Math.random())); // Box-Muller radius approximation
+            const r = spread * Math.sqrt(-2 * Math.log(Math.random())); 
             const theta = Math.random() * Math.PI * 2;
             const x = cx + r * Math.cos(theta);
             const y = cy + r * Math.sin(theta);
@@ -186,29 +200,47 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         }
     };
 
-    createCluster(-1500, -4000, 100, 300, "100, 200, 255"); // Pleiades-like
-    createCluster(3000, 1000, 150, 200, "255, 150, 50"); // Globular (orange)
+    createCluster(-1500, -4000, 100, 300, "100, 200, 255"); 
+    createCluster(3000, 1000, 150, 200, "255, 150, 50"); 
     createCluster(-5000, 1000, 80, 250, "255, 255, 255");
-    createCluster(1000, -5000, 120, 200, "200, 255, 200"); // Weird green one
+    createCluster(1000, -5000, 120, 200, "200, 255, 200"); 
 
-    // 4. BACKGROUND FIELD
+    // 4. BACKGROUND FIELD - Dense "Earth Sky" Look
     const starColors = [
         "255, 255, 255", // White
+        "220, 235, 255", // Blue-white
         "200, 220, 255", // Blue-ish
         "255, 240, 200", // Yellow-ish
-        "255, 200, 200"  // Red-ish
+        "255, 220, 200"  // Orange-ish
     ];
 
-    for (let i = 0; i < 2500; i++) {
+    // Increased count for realistic density
+    for (let i = 0; i < 6000; i++) {
+        const sizeRoll = Math.random();
+        let size;
+        let brightness;
+        
+        // Distribution for realistic sky: Many faint tiny stars, few bright ones
+        if (sizeRoll > 0.98) {
+            size = Math.random() * 2.0 + 1.0; // Rare bright stars
+            brightness = Math.random() * 0.4 + 0.6;
+        } else if (sizeRoll > 0.8) {
+            size = Math.random() * 1.0 + 0.5; // Medium stars
+            brightness = Math.random() * 0.3 + 0.4;
+        } else {
+            size = Math.random() * 0.5 + 0.2; // Faint background stars
+            brightness = Math.random() * 0.3 + 0.1;
+        }
+
         stars.push({
             pos: {
                 x: (Math.random() - 0.5) * 2 * worldSize,
                 y: (Math.random() - 0.5) * 2 * worldSize
             },
-            size: Math.random() * 1.5 + 0.5,
-            baseAlpha: Math.random() * 0.6 + 0.1,
+            size: size,
+            baseAlpha: brightness,
             twinklePhase: Math.random() * Math.PI * 2,
-            twinkleSpeed: 0.2 + Math.random() * 0.8,
+            twinkleSpeed: 0.1 + Math.random() * 0.5,
             color: starColors[Math.floor(Math.random() * starColors.length)]
         });
     }
@@ -233,9 +265,6 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
         let dt = baseDt;
         if (config.enableTimeDilation) {
-            // Gravitational Time Dilation: t' = t * sqrt(1 - Rs/r)
-            // As r -> Rs, t' -> 0 (time stops)
-            // We clamp the ratio to 0.99 to prevent numerical issues at the very edge before the object is consumed
             const ratio = Math.min(0.99, rs / dist);
             const dilationFactor = Math.sqrt(1 - ratio);
             dt = baseDt * dilationFactor;
@@ -324,47 +353,28 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     const drawStarInstance = (pos: Vector2, mag: number, star: BackgroundStar) => {
         const screenPos = toScreen(pos);
         
-        // Optimization: Cull off-screen stars
-        // Increase cull margin for large nebula particles
         const margin = star.isNebula ? 200 : 20;
         if (screenPos.x < -margin || screenPos.x > w + margin || screenPos.y < -margin || screenPos.y > h + margin) return;
 
         // --- Refined Twinkling Logic ---
-        
-        // 1. Distance Influence:
-        // Stars closer to BH twinkle more
         const distSq = pos.x * pos.x + pos.y * pos.y;
         const proximityFactor = Math.min(4.0, (rs * rs * 500) / (distSq + 100)); 
-
-        // 2. Brightness Influence:
         const brightnessFactor = Math.sqrt(mag);
 
-        // Dynamic Speed
         const dynamicSpeed = star.twinkleSpeed * (1 + proximityFactor + brightnessFactor * 0.5);
-
-        // Dynamic Intensity
-        // Nebulae shouldn't twinkle violently, just pulse slowly
         const dynamicIntensity = star.isNebula ? 0.05 : (0.15 + (proximityFactor * 0.15));
 
-        // Calculate Alpha
         const noise = Math.sin(time * dynamicSpeed + star.twinklePhase) + 
                       Math.sin(time * dynamicSpeed * 1.7 + star.twinklePhase) * 0.4;
         
         const alphaOffset = noise * dynamicIntensity;
-
-        // Modulate alpha by lensing magnification (flux conservation approximation)
-        // Nebulae magnify less visually to prevent washing out screen
         const magEffect = star.isNebula ? Math.pow(mag, 0.3) : mag;
         const lensedAlpha = Math.min(1.0, star.baseAlpha * magEffect);
-        
-        // Final Alpha
         const currentAlpha = Math.max(0.01, Math.min(1.0, lensedAlpha + alphaOffset));
 
-        // Draw
         ctx.fillStyle = `rgba(${star.color}, ${currentAlpha})`;
         ctx.beginPath();
         
-        // Scale star size
         const pulse = 1 + alphaOffset * 0.3;
         const maxR = star.isNebula ? 300 : 6;
         const r = Math.min(star.size * viewport.zoom * Math.sqrt(magEffect) * pulse, maxR);
@@ -373,18 +383,31 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         ctx.fill();
     };
 
+    // Calculate rotation offset for galaxies
+    // Use a scaler so the slider values (0-2) feel right.
+    // 0.2 rad/sec is a good base speed.
+    const galaxyRotationOffset = time * config.galaxyRotationSpeed * 0.2; 
+
     backgroundStars.current.forEach(star => {
+        let currentPos = star.pos;
+
+        // Apply Galaxy Rotation if applicable
+        if (star.isGalaxy && star.orbitCenter && star.orbitRadius !== undefined && star.initialAngle !== undefined) {
+            const currentAngle = star.initialAngle + galaxyRotationOffset;
+            currentPos = {
+                x: star.orbitCenter.x + star.orbitRadius * Math.cos(currentAngle),
+                y: star.orbitCenter.y + star.orbitRadius * Math.sin(currentAngle)
+            };
+        }
+
         // Lensing
-        // For performance, maybe skip lensing calculation for very distant/faint stars?
-        // But for correctness, we keep it. 
-        const lensing = calculateLensing(star.pos, config.blackHoleMass, config.showLensing);
+        const lensing = calculateLensing(currentPos, config.blackHoleMass, config.showLensing);
         
         // Draw Primary Image
         drawStarInstance(lensing.pos, lensing.mag, star);
         
-        // Draw Secondary Image (if visible and not a huge nebula puff which might look weird inverted)
+        // Draw Secondary Image
         if (config.showLensing && lensing.pos2 && lensing.mag2 > 0.02) {
-             // Optional: Don't draw secondary images for nebulae to avoid clutter/artifacts in center
              if (!star.isNebula) {
                  drawStarInstance(lensing.pos2, lensing.mag2, star);
              }
@@ -397,7 +420,6 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
       ctx.lineWidth = 1;
       
       const gridSize = config.gridDensity;
-      // Calculate a safe range to cover the screen regardless of rotation
       const diag = Math.sqrt(w * w + h * h);
       const range = diag / viewport.zoom / 2 + 200;
       
@@ -414,7 +436,7 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
       // Vertical Lines
       for (let x = startX; x <= maxX; x += gridSize) {
         let first = true;
-        for (let y = minY; y <= maxY; y += 40) { // Optimize step for performance
+        for (let y = minY; y <= maxY; y += 40) { 
           const worldPos = { x, y };
           const lensedWorld = calculateLensing(worldPos, config.blackHoleMass, config.showLensing).pos;
           const screenPos = toScreen(lensedWorld);
@@ -498,8 +520,6 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
     });
 
     // --- DRAW SHADOW (Event Horizon) ---
-    // The "Shadow" is the apparent size of the black hole, which is ~2.6 * Rs (3 * sqrt(3) / 2)
-    // We draw this last to ensure it occludes everything behind it, including lensed stars
     const shadowRadius = rs * 2.6 * viewport.zoom;
     
     ctx.fillStyle = '#000000';
@@ -543,13 +563,6 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
         
-        // Panning needs to adjust for rotation.
-        // We need to rotate the screen delta vector into the world-aligned camera space.
-        // Screen Delta Vector (dx, dy)
-        // Inverse Rotation (Screen -> World): Rot(-angle)
-        // x' = x cos(-a) - y sin(-a) = x cos(a) + y sin(a)
-        // y' = x sin(-a) + y cos(-a) = -x sin(a) + y cos(a)
-
         const dWorldX = (dx * cos + dy * sin) / viewport.zoom;
         const dWorldY = (-dx * sin + dy * cos) / viewport.zoom;
 
@@ -585,7 +598,6 @@ const BlackHoleCanvas: React.FC<BlackHoleCanvasProps> = ({
 
         const lensedPos = getLensedPosition(obj.pos, config.blackHoleMass, config.showLensing);
         
-        // Manual toScreen calculation (must match render logic)
         const rx = lensedPos.x + viewport.offset.x;
         const ry = lensedPos.y + viewport.offset.y;
         const rotX = rx * cos - ry * sin;

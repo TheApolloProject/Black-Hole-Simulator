@@ -28,6 +28,7 @@ export interface SimulationConfig {
   showGrid: boolean;
   showLensing: boolean;
   enableTimeDilation: boolean;
+  galaxyRotationSpeed: number; // New: Controls speed of background galaxy rotation
   renderMode: 'full' | 'wireframe' | 'simple';
   isPaused: boolean;
 }
