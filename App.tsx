@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import BlackHoleCanvas from './components/BlackHoleCanvas';
+import BlackHoleCanvas3D from './components/BlackHoleCanvas3D';
 import ControlPanel from './components/ControlPanel';
 import AIChat from './components/AIChat';
 import { SimulationConfig, CelestialObject, ViewportState, CelestialType } from './types';
@@ -23,9 +23,9 @@ const App: React.FC = () => {
   const [objects, setObjects] = useState<CelestialObject[]>([...INITIAL_OBJECTS]);
   
   const [viewport, setViewport] = useState<ViewportState>({
-    offset: { x: 0, y: 0 },
-    zoom: 1.0,
-    rotation: 0
+    cameraPosition: { x: 0, y: 300, z: 800 },
+    cameraTarget: { x: 0, y: 0, z: 0 },
+    zoom: 1.0
   });
 
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
@@ -34,28 +34,31 @@ const App: React.FC = () => {
   // Handlers
   const handleReset = () => {
     setObjects([...INITIAL_OBJECTS]);
-    setViewport({ offset: { x: 0, y: 0 }, zoom: 1.0, rotation: 0 });
+    setViewport({ cameraPosition: { x: 0, y: 300, z: 800 }, cameraTarget: { x: 0, y: 0, z: 0 }, zoom: 1.0 });
     setConfig(prev => ({ ...prev, blackHoleMass: 10, timeScale: 1.0, galaxyRotationSpeed: 0.2 }));
   };
 
   const handleAddObject = () => {
     const randomAngle = Math.random() * Math.PI * 2;
+    const randomPhi = Math.random() * Math.PI; // For 3D spherical coordinates
     const distance = 400 + Math.random() * 200;
     const speed = 15 + Math.random() * 10;
     
-    // Position
-    const px = Math.cos(randomAngle) * distance;
-    const py = Math.sin(randomAngle) * distance;
+    // Position in 3D using spherical coordinates
+    const px = Math.sin(randomPhi) * Math.cos(randomAngle) * distance;
+    const py = Math.sin(randomPhi) * Math.sin(randomAngle) * distance;
+    const pz = Math.cos(randomPhi) * distance;
 
-    // Velocity (perpendicularish for orbit)
+    // Velocity (perpendicular for orbit)
     const vx = -Math.sin(randomAngle) * speed;
     const vy = Math.cos(randomAngle) * speed;
+    const vz = (Math.random() - 0.5) * speed * 0.3; // Small z-component
 
     const newObj: CelestialObject = {
       id: `comet-${Date.now()}`,
       type: CelestialType.COMET,
-      pos: { x: px, y: py },
-      vel: { x: vx, y: vy },
+      pos: { x: px, y: py, z: pz },
+      vel: { x: vx, y: vy, z: vz },
       mass: 0.5,
       radius: 3,
       color: '#a5f3fc',
@@ -69,16 +72,18 @@ const App: React.FC = () => {
     // Spawns an object on a hyperbolic trajectory designed to slingshot
     const startX = -900;
     const startY = 140; // Aim slightly off-center to miss event horizon
+    const startZ = 50;
     
     // High velocity to ensure open orbit (hyperbolic)
     const vx = 22; 
     const vy = -1.5; // Slight downward drift to counteract attraction initially
+    const vz = 0;
 
     const newObj: CelestialObject = {
       id: `slingshot-${Date.now()}`,
       type: CelestialType.COMET,
-      pos: { x: startX, y: startY },
-      vel: { x: vx, y: vy },
+      pos: { x: startX, y: startY, z: startZ },
+      vel: { x: vx, y: vy, z: vz },
       mass: 0.5,
       radius: 4,
       color: '#86efac', // Light Green to distinguish
@@ -88,7 +93,7 @@ const App: React.FC = () => {
     setObjects(prev => [...prev, newObj]);
     // Center view if zoomed in too much
     if (viewport.zoom > 1.5) {
-       setViewport(prev => ({ ...prev, zoom: 1.0, offset: { x: 0, y: 0 } }));
+       setViewport(prev => ({ ...prev, zoom: 1.0, cameraPosition: { x: 0, y: 300, z: 800 }, cameraTarget: { x: 0, y: 0, z: 0 } }));
     }
   };
 
@@ -113,6 +118,7 @@ const App: React.FC = () => {
   const handleAddPlanet = (key: PlanetPresetKey) => {
     const preset = PLANET_PRESETS[key];
     const randomAngle = Math.random() * Math.PI * 2;
+    const randomPhi = Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.3; // Near equatorial plane
     const distance = 350 + Math.random() * 300; // Stable orbit range
     
     // Calculate Circular Orbit Velocity: v = sqrt(GM / r)
@@ -120,15 +126,21 @@ const App: React.FC = () => {
     // v_mag = sqrt(G * BH_Mass / r)
     const vMag = Math.sqrt((G * config.blackHoleMass) / distance);
     
-    // Tangent vector
+    // Position in 3D
+    const px = Math.sin(randomPhi) * Math.cos(randomAngle) * distance;
+    const py = Math.sin(randomPhi) * Math.sin(randomAngle) * distance;
+    const pz = Math.cos(randomPhi) * distance;
+
+    // Tangent vector (perpendicular to radius)
     const vx = -Math.sin(randomAngle) * vMag;
     const vy = Math.cos(randomAngle) * vMag;
+    const vz = 0;
 
     const newPlanet: CelestialObject = {
       id: `planet-${Date.now()}`,
       type: CelestialType.PLANET,
-      pos: { x: Math.cos(randomAngle) * distance, y: Math.sin(randomAngle) * distance },
-      vel: { x: vx, y: vy },
+      pos: { x: px, y: py, z: pz },
+      vel: { x: vx, y: vy, z: vz },
       mass: preset.mass,
       radius: preset.radius,
       color: preset.color,
@@ -141,19 +153,26 @@ const App: React.FC = () => {
   const handleAddStar = (key: StarPresetKey) => {
     const preset = STAR_PRESETS[key];
     const randomAngle = Math.random() * Math.PI * 2;
+    const randomPhi = Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 0.3; // Near equatorial plane
     // Stars generally further out to avoid crowding the inner visualization
     const distance = 500 + Math.random() * 400; 
     
     const vMag = Math.sqrt((G * config.blackHoleMass) / distance);
     
+    // Position in 3D
+    const px = Math.sin(randomPhi) * Math.cos(randomAngle) * distance;
+    const py = Math.sin(randomPhi) * Math.sin(randomAngle) * distance;
+    const pz = Math.cos(randomPhi) * distance;
+
     const vx = -Math.sin(randomAngle) * vMag;
     const vy = Math.cos(randomAngle) * vMag;
+    const vz = 0;
 
     const newStar: CelestialObject = {
       id: `star-${Date.now()}`,
       type: CelestialType.STAR,
-      pos: { x: Math.cos(randomAngle) * distance, y: Math.sin(randomAngle) * distance },
-      vel: { x: vx, y: vy },
+      pos: { x: px, y: py, z: pz },
+      vel: { x: vx, y: vy, z: vz },
       mass: preset.mass,
       radius: preset.radius,
       color: preset.color,
@@ -168,7 +187,7 @@ const App: React.FC = () => {
       
       {/* Main Simulation Area */}
       <div className="flex-1 h-full relative">
-        <BlackHoleCanvas 
+        <BlackHoleCanvas3D 
             config={config} 
             objects={objects} 
             setObjects={setObjects}

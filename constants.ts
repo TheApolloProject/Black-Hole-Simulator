@@ -42,8 +42,8 @@ export const INITIAL_OBJECTS: CelestialObject[] = [
   {
     id: 'star-1',
     type: CelestialType.STAR,
-    pos: { x: 300, y: 0 },
-    vel: { x: 0, y: 15 }, // Circular orbit approx
+    pos: { x: 300, y: 0, z: 0 },
+    vel: { x: 0, y: 15, z: 0 }, // Circular orbit approx
     mass: 10,
     radius: 12,
     color: '#fbbf24', // Amber
@@ -52,8 +52,8 @@ export const INITIAL_OBJECTS: CelestialObject[] = [
   {
     id: 'planet-1',
     type: CelestialType.PLANET,
-    pos: { x: -400, y: 100 },
-    vel: { x: 5, y: -12 },
+    pos: { x: -400, y: 100, z: 50 },
+    vel: { x: 5, y: -12, z: 0 },
     mass: 2,
     radius: 5,
     color: '#9ca3af', // Gray
@@ -62,8 +62,8 @@ export const INITIAL_OBJECTS: CelestialObject[] = [
   {
     id: 'comet-1',
     type: CelestialType.COMET,
-    pos: { x: -600, y: -600 },
-    vel: { x: 25, y: 20 }, // Hyperbolic
+    pos: { x: -600, y: -600, z: -100 },
+    vel: { x: 25, y: 20, z: 5 }, // Hyperbolic
     mass: 0.5,
     radius: 3,
     color: '#60a5fa', // Blue

@@ -3,6 +3,12 @@ export interface Vector2 {
   y: number;
 }
 
+export interface Vector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export enum CelestialType {
   STAR = 'STAR',
   PLANET = 'PLANET',
@@ -13,12 +19,12 @@ export enum CelestialType {
 export interface CelestialObject {
   id: string;
   type: CelestialType;
-  pos: Vector2; // Position relative to Black Hole center (0,0)
-  vel: Vector2;
+  pos: Vector3; // Position relative to Black Hole center (0,0,0)
+  vel: Vector3;
   mass: number;
   radius: number;
   color: string;
-  trail: Vector2[];
+  trail: Vector3[];
 }
 
 export interface SimulationConfig {
@@ -34,9 +40,9 @@ export interface SimulationConfig {
 }
 
 export interface ViewportState {
-  offset: Vector2; // Camera panning
-  zoom: number;    // Camera zoom
-  rotation: number; // Pseudo-3D rotation angle (rad)
+  cameraPosition: Vector3; // 3D Camera position
+  cameraTarget: Vector3;   // Where camera is looking
+  zoom: number;            // Camera zoom (distance multiplier)
 }
 
 export interface ChatMessage {
