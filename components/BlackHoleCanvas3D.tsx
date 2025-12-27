@@ -94,8 +94,6 @@ const CelestialObjectRenderer: React.FC<{
     
     if (dist < 0.001) return obj.pos;
     
-    const u = dist / re;
-    const uSq = u * u;
     const theta1 = (dist + Math.sqrt(dist * dist + 4 * re * re)) / 2;
     const scale = theta1 / dist;
     
